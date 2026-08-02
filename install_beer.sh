@@ -53,28 +53,6 @@ apt update
 apt -y upgrade
 
 
-
-# =====================================================
-# Usuwanie Chromium
-# =====================================================
-
-echo
-echo "== Usuwanie Chromium =="
-
-
-apt purge -y \
-    chromium \
-    chromium-browser \
-    chromium-common \
-    chromium-driver \
-    2>/dev/null || true
-
-
-rm -rf "$USER_HOME/.config/chromium"
-rm -rf "$USER_HOME/.cache/chromium"
-
-
-
 # =====================================================
 # Instalacja pakietów
 # =====================================================
