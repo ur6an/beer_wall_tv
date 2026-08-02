@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.93"
+echo " Beer Wall TV Installer v0.94"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
@@ -446,11 +446,10 @@ echo "== Watchdog =="
 
 
 cat >/etc/watchdog.conf <<EOF
-
 watchdog-device = /dev/watchdog
-
+watchdog-timeout = 15
 interval = 10
-
+priority = 0
 EOF
 
 
