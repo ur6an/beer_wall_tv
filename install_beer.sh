@@ -3,28 +3,48 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer"
+echo " Beer Wall TV Installer v0.9"
 echo " Orange Pi PC + Armbian"
+echo " Firefox ESR Kiosk"
 echo "======================================"
 
 if [ "$EUID" -ne 0 ]; then
-    echo "Uruchom skrypt jako root."
+    echo "Uruchom skrypt przez sudo."
     exit 1
 fi
 
 
-echo
-read -p "Podaj nazwę użytkownika systemowego: " USER_NAME
+# =====================================================
+# Wykrycie użytkownika
+# =====================================================
+
+if [ -n "$SUDO_USER" ]; then
+    USER_NAME="$SUDO_USER"
+else
+    USER_NAME="$USER"
+fi
 
 
 if ! id "$USER_NAME" >/dev/null 2>&1; then
-    echo "Użytkownik $USER_NAME nie istnieje."
-    echo "Tworzę użytkownika..."
-
-    adduser --disabled-password --gecos "" "$USER_NAME"
-    usermod -aG sudo "$USER_NAME"
+    echo "BŁĄD: użytkownik $USER_NAME nie istnieje."
+    exit 1
 fi
 
+
+USER_HOME=$(eval echo ~$USER_NAME)
+
+
+echo
+echo "Użytkownik:"
+echo "$USER_NAME"
+
+echo "Katalog domowy:"
+echo "$USER_HOME"
+
+
+# =====================================================
+# Aktualizacja
+# =====================================================
 
 echo
 echo "== Aktualizacja systemu =="
@@ -33,8 +53,35 @@ apt update
 apt -y upgrade
 
 
+
+# =====================================================
+# Usuwanie Chromium
+# =====================================================
+
+echo
+echo "== Usuwanie Chromium =="
+
+
+apt purge -y \
+    chromium \
+    chromium-browser \
+    chromium-common \
+    chromium-driver \
+    2>/dev/null || true
+
+
+rm -rf "$USER_HOME/.config/chromium"
+rm -rf "$USER_HOME/.cache/chromium"
+
+
+
+# =====================================================
+# Instalacja pakietów
+# =====================================================
+
 echo
 echo "== Instalacja pakietów =="
+
 
 DEBIAN_FRONTEND=noninteractive apt install -y \
     apache2 \
@@ -53,16 +100,22 @@ DEBIAN_FRONTEND=noninteractive apt install -y \
     lightdm \
     unclutter \
     x11-xserver-utils \
-    wget \
     curl \
+    wget \
     tar
 
 
 PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 
 
+
+# =====================================================
+# Strona WWW
+# =====================================================
+
 echo
 echo "== Pobieranie Beer Wall TV =="
+
 
 rm -rf /var/www/lamus
 
@@ -71,26 +124,41 @@ mkdir -p /var/www
 
 cd /tmp
 
-wget -O lamus.tar.gz \
+
+curl -fL \
+-o lamus.tar.gz \
 https://raw.githubusercontent.com/ur6an/beer_wall_tv/main/lamus.tar.gz
+
 
 
 echo
 echo "== Rozpakowanie strony =="
 
+
 tar -xzf lamus.tar.gz -C /var/www
 
 
+
 if [ ! -d "/var/www/lamus" ]; then
-    echo "Błąd: brak katalogu /var/www/lamus"
+
+    echo "BŁĄD: brak katalogu /var/www/lamus"
+
     exit 1
+
 fi
 
 
+
 chown -R www-data:www-data /var/www/lamus
+
 chmod -R 755 /var/www/lamus
 
 
+
+
+# =====================================================
+# Apache + PHP
+# =====================================================
 
 echo
 echo "== Konfiguracja Apache =="
@@ -99,6 +167,7 @@ echo "== Konfiguracja Apache =="
 a2enmod proxy_fcgi setenvif rewrite
 
 a2enconf php${PHP_VERSION}-fpm
+
 
 
 cat >/etc/apache2/sites-available/000-default.conf <<EOF
@@ -136,21 +205,31 @@ EOF
 
 
 systemctl enable php${PHP_VERSION}-fpm
+
 systemctl restart php${PHP_VERSION}-fpm
 
+
 systemctl enable apache2
+
 systemctl restart apache2
 
 
 
+
+
+# =====================================================
+# Openbox kiosk
+# =====================================================
+
 echo
-echo "== Konfiguracja Openbox =="
+echo "== Konfiguracja Firefox ESR Kiosk =="
 
 
-mkdir -p /home/$USER_NAME/.config/openbox
+mkdir -p "$USER_HOME/.config/openbox"
 
 
-cat >/home/$USER_NAME/.config/openbox/autostart <<'EOF'
+
+cat >"$USER_HOME/.config/openbox/autostart" <<'EOF'
 
 #!/bin/bash
 
@@ -172,30 +251,38 @@ while true
 do
 
 firefox-esr \
- --kiosk \
- --private-window \
- http://localhost
+    --kiosk \
+    --private-window \
+    http://localhost
 
 
 sleep 5
+
 
 done
 
 EOF
 
 
-chmod +x /home/$USER_NAME/.config/openbox/autostart
+
+chmod +x "$USER_HOME/.config/openbox/autostart"
 
 
-chown -R $USER_NAME:$USER_NAME /home/$USER_NAME/.config
+chown -R "$USER_NAME:$USER_NAME" "$USER_HOME/.config"
 
 
+
+
+# =====================================================
+# LightDM autologin
+# =====================================================
 
 echo
 echo "== Konfiguracja LightDM =="
 
 
 mkdir -p /etc/lightdm/lightdm.conf.d
+
 
 
 cat >/etc/lightdm/lightdm.conf.d/10-autologin.conf <<EOF
@@ -211,31 +298,40 @@ user-session=openbox
 EOF
 
 
+
 systemctl enable lightdm
 
 
 
+
+# =====================================================
+# Wyłączenie wygaszania
+# =====================================================
+
 echo
-echo "== Wyłączenie wygaszania konsoli =="
+echo "== Konfiguracja konsoli =="
 
 
-if grep -q "consoleblank=0" /boot/armbianEnv.txt; then
+if [ -f /boot/armbianEnv.txt ]; then
 
-echo "consoleblank już ustawiony"
-
-else
-
+grep -q "consoleblank=0" /boot/armbianEnv.txt || \
 echo "extraargs=consoleblank=0" >> /boot/armbianEnv.txt
 
 fi
 
 
 
+
+# =====================================================
+# Czyszczenie
+# =====================================================
+
 echo
 echo "== Czyszczenie =="
 
 
 apt autoremove -y
+
 apt autoclean
 
 
@@ -247,15 +343,26 @@ echo "======================================"
 
 echo
 echo "Użytkownik: $USER_NAME"
-echo "WWW: http://localhost"
-echo "Pliki: /var/www/lamus"
+
+echo "WWW:"
+echo "http://localhost"
+
 echo
+
+echo "Strona:"
+echo "/var/www/lamus"
+
+echo
+
 echo "Po restarcie:"
-echo "- automatyczne logowanie"
+echo "- autologowanie"
 echo "- Openbox"
 echo "- Firefox ESR kiosk"
 echo "- Beer Wall TV"
+
 echo
 
-echo "Wykonaj:"
-echo "reboot"
+echo "Restart:"
+echo "sudo reboot"
+
+echo "======================================"
