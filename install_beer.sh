@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.9"
+echo " Beer Wall TV Installer v0.91"
 echo " Orange Pi PC + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
