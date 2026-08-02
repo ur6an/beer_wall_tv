@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.96"
+echo " Beer Wall TV Installer v0.97"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
@@ -326,7 +326,6 @@ echo "== Firefox kiosk =="
 
 
 cat >/usr/local/bin/firefox-kiosk.sh <<EOF
-
 #!/bin/bash
 
 
