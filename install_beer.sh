@@ -3,47 +3,37 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.97"
+echo " Beer Wall TV Installer v0.98"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
 
 if [ "$EUID" -ne 0 ]; then
-    echo "Uruchom przez sudo."
+    echo "Uruchom przez sudo"
     exit 1
 fi
 
 
-# =====================================================
-# Wykrycie użytkownika
-# =====================================================
+# -----------------------------------------------------
+# użytkownik
+# -----------------------------------------------------
 
 if [ -n "$SUDO_USER" ]; then
     USER_NAME="$SUDO_USER"
 else
-    USER_NAME="$USER"
-fi
-
-
-if ! id "$USER_NAME" >/dev/null 2>&1; then
-    echo "Brak użytkownika $USER_NAME"
-    exit 1
+    USER_NAME=$(logname)
 fi
 
 
 USER_HOME=$(eval echo ~$USER_NAME)
 
-
 echo "Użytkownik: $USER_NAME"
-echo "HOME: $USER_HOME"
 
 
 
-# =====================================================
-# Pakiety
-# =====================================================
-
-echo "== Pakiety =="
+# -----------------------------------------------------
+# pakiety
+# -----------------------------------------------------
 
 apt update
 
@@ -63,9 +53,9 @@ xinit \
 openbox \
 lightdm \
 unclutter \
+xdotool \
 x11-xserver-utils \
 curl \
-wget \
 tar \
 watchdog
 
@@ -75,11 +65,11 @@ PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 
 
 
-# =====================================================
-# WWW
-# =====================================================
+# -----------------------------------------------------
+# Beer Wall TV
+# -----------------------------------------------------
 
-echo "== Beer Wall TV =="
+echo "== Pobieranie strony =="
 
 
 rm -rf /var/www/lamus
@@ -98,10 +88,13 @@ https://raw.githubusercontent.com/ur6an/beer_wall_tv/main/lamus.tar.gz
 tar -xzf lamus.tar.gz -C /var/www/lamus
 
 
-test -f /var/www/lamus/index.php || {
+if [ ! -f /var/www/lamus/index.php ]; then
+
 echo "Brak index.php"
+
 exit 1
-}
+
+fi
 
 
 chown -R www-data:www-data /var/www/lamus
@@ -110,12 +103,9 @@ chmod -R 755 /var/www/lamus
 
 
 
-# =====================================================
+# -----------------------------------------------------
 # Apache
-# =====================================================
-
-echo "== Apache =="
-
+# -----------------------------------------------------
 
 a2enmod proxy_fcgi setenvif rewrite
 
@@ -144,73 +134,26 @@ ErrorLog \${APACHE_LOG_DIR}/error.log
 
 CustomLog \${APACHE_LOG_DIR}/access.log combined
 
+
 </VirtualHost>
 
 EOF
 
 
 systemctl enable apache2
+
 systemctl restart apache2
 
+
 systemctl enable php${PHP_VERSION}-fpm
+
 systemctl restart php${PHP_VERSION}-fpm
 
 
 
-# =====================================================
-# Loading screen
-# =====================================================
-
-cat >/var/www/lamus/loading.html <<EOF
-
-<html>
-
-<head>
-
-<style>
-
-body{
-background:#111;
-color:white;
-display:flex;
-height:100vh;
-align-items:center;
-justify-content:center;
-font-family:Arial;
-text-align:center;
-}
-
-h1{
-font-size:70px;
-}
-
-</style>
-
-</head>
-
-
-<body>
-
-<h1>
-🍺<br>
-Beer Wall TV<br>
-Ładowanie...
-</h1>
-
-</body>
-
-</html>
-
-EOF
-
-
-
-# =====================================================
+# -----------------------------------------------------
 # Openbox
-# =====================================================
-
-echo "== Openbox =="
-
+# -----------------------------------------------------
 
 mkdir -p $USER_HOME/.config/openbox
 
@@ -220,17 +163,12 @@ cat >$USER_HOME/.config/openbox/autostart <<EOF
 #!/bin/bash
 
 
-# blokada wygaszania
-
 xset s off
 
 xset s noblank
 
 xset -dpms
 
-
-
-# ukrycie kursora
 
 unclutter -idle 0.5 -root -jitter 2 &
 
@@ -243,26 +181,14 @@ chown -R $USER_NAME:$USER_NAME $USER_HOME/.config
 
 
 
-# =====================================================
-# X11 blokada ekranu
-# =====================================================
-
-echo "== X11 display =="
-
+# -----------------------------------------------------
+# X11 - brak wygaszania
+# -----------------------------------------------------
 
 mkdir -p /etc/X11/xorg.conf.d
 
 
 cat >/etc/X11/xorg.conf.d/10-monitor.conf <<EOF
-
-Section "Monitor"
-
-Identifier "HDMI"
-
-Option "DPMS" "false"
-
-EndSection
-
 
 Section "ServerFlags"
 
@@ -276,16 +202,20 @@ Option "OffTime" "0"
 
 EndSection
 
+
+Section "Extensions"
+
+Option "DPMS" "Disable"
+
+EndSection
+
 EOF
 
 
 
-# =====================================================
-# LightDM
-# =====================================================
-
-echo "== LightDM =="
-
+# -----------------------------------------------------
+# LightDM autologin
+# -----------------------------------------------------
 
 mkdir -p /etc/lightdm/lightdm.conf.d
 
@@ -300,61 +230,44 @@ autologin-user-timeout=0
 
 user-session=openbox
 
-EOF
-
-
-
-cat >/etc/lightdm/lightdm.conf.d/20-display.conf <<EOF
-
-[Seat:*]
-
 xserver-command=X -s 0 -dpms
 
 EOF
-
 
 
 systemctl enable lightdm
 
 
 
-# =====================================================
-# Firefox kiosk service
-# =====================================================
-
-echo "== Firefox kiosk =="
-
+# -----------------------------------------------------
+# Firefox kiosk
+# -----------------------------------------------------
 
 cat >/usr/local/bin/firefox-kiosk.sh <<EOF
 #!/bin/bash
 
-
 export DISPLAY=:0
 
-
-sleep 8
+sleep 15
 
 
 while true
-
 do
-
 
 firefox-esr \
 --kiosk \
 --private-window \
-http://localhost/loading.html
+http://localhost/
 
 
 sleep 5
-
 
 done
 
 EOF
 
 
-chmod +x /usr/local/bin/firefox-kiosk.sh
+chmod 755 /usr/local/bin/firefox-kiosk.sh
 
 
 
@@ -387,19 +300,15 @@ WantedBy=graphical.target
 EOF
 
 
-
 systemctl daemon-reload
 
 systemctl enable firefox-kiosk.service
 
 
 
-# =====================================================
+# -----------------------------------------------------
 # Update Beer Wall
-# =====================================================
-
-echo "== Update =="
-
+# -----------------------------------------------------
 
 cat >/usr/local/bin/update-beer-wall <<'EOF'
 
@@ -409,10 +318,12 @@ DATE=$(date +%Y%m%d_%H%M)
 
 mkdir -p /var/www/backup
 
-cp -a /var/www/lamus /var/www/backup/lamus_$DATE
+cp -a /var/www/lamus \
+/var/www/backup/lamus_$DATE
 
 
 cd /tmp
+
 
 curl -fL \
 -o lamus.tar.gz \
@@ -422,7 +333,8 @@ https://raw.githubusercontent.com/ur6an/beer_wall_tv/main/lamus.tar.gz
 rm -rf /var/www/lamus/*
 
 
-tar -xzf lamus.tar.gz -C /var/www/lamus
+tar -xzf lamus.tar.gz \
+-C /var/www/lamus
 
 
 chown -R www-data:www-data /var/www/lamus
@@ -437,22 +349,23 @@ chmod +x /usr/local/bin/update-beer-wall
 
 
 
-# =====================================================
-# Watchdog
-# =====================================================
-
-echo "== Watchdog =="
-
-apt install -y watchdog
+# -----------------------------------------------------
+# Watchdog Orange Pi PC
+# -----------------------------------------------------
 
 modprobe sunxi_wdt || true
 
 
 cat >/etc/watchdog.conf <<EOF
+
 watchdog-device = /dev/watchdog
+
 watchdog-timeout = 15
+
 interval = 10
+
 priority = 0
+
 EOF
 
 
@@ -460,53 +373,27 @@ mkdir -p /etc/systemd/system/watchdog.service.d
 
 
 cat >/etc/systemd/system/watchdog.service.d/override.conf <<EOF
+
 [Service]
-Restart=always
-RestartSec=5
+
 LimitRTPRIO=infinity
+
 LimitMEMLOCK=infinity
+
 EOF
 
 
 systemctl daemon-reload
 
+systemctl enable watchdog
 
-systemctl enable watchdog.service
-
-
-systemctl stop watchdog.service || true
-
-sleep 2
-
-
-systemctl start watchdog.service || {
-    echo "UWAGA: watchdog nie wystartował automatycznie"
-}
-
-
-systemctl status watchdog.service --no-pager || true
+systemctl restart watchdog || true
 
 
 
-# =====================================================
-# Boot
-# =====================================================
-
-echo "== Boot =="
-
-
-if [ -f /boot/armbianEnv.txt ]; then
-
-grep -q "consoleblank=0" /boot/armbianEnv.txt || \
-echo "extraargs=quiet loglevel=0 consoleblank=0" >> /boot/armbianEnv.txt
-
-fi
-
-
-
-# =====================================================
-# Sleep OFF
-# =====================================================
+# -----------------------------------------------------
+# blokada sleep
+# -----------------------------------------------------
 
 systemctl mask sleep.target || true
 systemctl mask suspend.target || true
@@ -521,13 +408,16 @@ echo " INSTALACJA ZAKOŃCZONA"
 echo "======================================"
 
 echo
-echo "Użytkownik: $USER_NAME"
+
+echo "Start:"
+echo "sudo reboot"
+
 echo
-echo "WWW:"
+
+echo "Strona:"
 echo "http://localhost"
+
 echo
+
 echo "Aktualizacja:"
 echo "sudo update-beer-wall"
-echo
-echo "Restart:"
-echo "sudo reboot"
