@@ -444,6 +444,10 @@ chmod +x /usr/local/bin/update-beer-wall
 
 echo "== Watchdog =="
 
+apt install -y watchdog
+
+modprobe sunxi_wdt || true
+
 
 cat >/etc/watchdog.conf <<EOF
 watchdog-device = /dev/watchdog
@@ -452,10 +456,36 @@ interval = 10
 priority = 0
 EOF
 
-systemctl daemon-reload
-systemctl enable watchdog
 
-systemctl restart watchdog
+mkdir -p /etc/systemd/system/watchdog.service.d
+
+
+cat >/etc/systemd/system/watchdog.service.d/override.conf <<EOF
+[Service]
+Restart=always
+RestartSec=5
+LimitRTPRIO=infinity
+LimitMEMLOCK=infinity
+EOF
+
+
+systemctl daemon-reload
+
+
+systemctl enable watchdog.service
+
+
+systemctl stop watchdog.service || true
+
+sleep 2
+
+
+systemctl start watchdog.service || {
+    echo "UWAGA: watchdog nie wystartował automatycznie"
+}
+
+
+systemctl status watchdog.service --no-pager || true
 
 
 
