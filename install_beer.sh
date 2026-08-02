@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.94"
+echo " Beer Wall TV Installer v0.95"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
@@ -452,7 +452,7 @@ interval = 10
 priority = 0
 EOF
 
-
+systemctl daemon-reload
 systemctl enable watchdog
 
 systemctl restart watchdog
