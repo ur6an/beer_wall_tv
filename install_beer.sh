@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v0.98"
+echo " Beer Wall TV Installer v0.99"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
@@ -352,20 +352,18 @@ chmod +x /usr/local/bin/update-beer-wall
 # -----------------------------------------------------
 # Watchdog Orange Pi PC
 # -----------------------------------------------------
+echo "== Watchdog =="
+
+apt install -y watchdog
 
 modprobe sunxi_wdt || true
 
 
 cat >/etc/watchdog.conf <<EOF
-
 watchdog-device = /dev/watchdog
-
 watchdog-timeout = 15
-
 interval = 10
-
 priority = 0
-
 EOF
 
 
@@ -373,23 +371,31 @@ mkdir -p /etc/systemd/system/watchdog.service.d
 
 
 cat >/etc/systemd/system/watchdog.service.d/override.conf <<EOF
-
 [Service]
-
+Restart=always
+RestartSec=5
 LimitRTPRIO=infinity
-
 LimitMEMLOCK=infinity
-
 EOF
 
 
 systemctl daemon-reload
 
-systemctl enable watchdog
 
-systemctl restart watchdog || true
+systemctl enable watchdog.service
 
 
+systemctl stop watchdog.service || true
+
+sleep 2
+
+
+systemctl start watchdog.service || {
+    echo "UWAGA: watchdog nie wystartował automatycznie"
+}
+
+
+systemctl status watchdog.service --no-pager || true
 
 # -----------------------------------------------------
 # blokada sleep
