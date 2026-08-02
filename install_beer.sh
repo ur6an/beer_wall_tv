@@ -113,13 +113,20 @@ echo
 echo "== Rozpakowanie strony =="
 
 
-tar -xzf lamus.tar.gz -C /var/www
+rm -rf /var/www/lamus
+
+mkdir -p /var/www/lamus
 
 
+tar -xzf lamus.tar.gz -C /var/www/lamus
 
-if [ ! -d "/var/www/lamus" ]; then
 
-    echo "BŁĄD: brak katalogu /var/www/lamus"
+if [ ! -f "/var/www/lamus/index.php" ]; then
+
+    echo "BŁĄD: brak pliku index.php"
+
+    echo "Zawartość archiwum:"
+    tar -tzf /tmp/lamus.tar.gz
 
     exit 1
 
