@@ -3,7 +3,7 @@
 set -e
 
 echo "======================================"
-echo " Beer Wall TV Installer v1.01"
+echo " Beer Wall TV Installer v1.02"
 echo " Orange Pi + Armbian"
 echo " Firefox ESR Kiosk"
 echo "======================================"
@@ -165,7 +165,7 @@ EOF
 systemctl enable lightdm
 
 # -----------------------------------------------------
-# Firefox Kiosk Skrypt & Usługa Systemd
+# Firefox Kiosk Skrypt & Usługa Systemd (POPRAWIONY PROFIL)
 # -----------------------------------------------------
 cat >/usr/local/bin/firefox-kiosk.sh <<EOF
 #!/bin/bash
@@ -181,12 +181,19 @@ xset s off
 xset s noblank
 xset -dpms
 
+PROFILE_DIR="/tmp/ff-kiosk-profile"
+
 while true
 do
+    # Czyszczenie i przygotowanie profilu przed uruchomieniem
+    rm -rf "\$PROFILE_DIR"
+    mkdir -p "\$PROFILE_DIR"
+    chown -R $USER_NAME:$USER_NAME "\$PROFILE_DIR"
+
     firefox-esr \
         --kiosk \
         --private-window \
-        --profile /tmp/ff-kiosk-profile \
+        --profile "\$PROFILE_DIR" \
         http://localhost/
 
     sleep 3
@@ -194,26 +201,6 @@ done
 EOF
 
 chmod 755 /usr/local/bin/firefox-kiosk.sh
-
-cat >/etc/systemd/system/firefox-kiosk.service <<EOF
-[Unit]
-Description=Beer Wall Firefox Kiosk
-After=graphical.target lightdm.service
-
-[Service]
-User=$USER_NAME
-Environment=DISPLAY=:0
-Environment=XAUTHORITY=$USER_HOME/.Xauthority
-ExecStart=/usr/local/bin/firefox-kiosk.sh
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=graphical.target
-EOF
-
-systemctl daemon-reload
-systemctl enable firefox-kiosk.service
 
 # -----------------------------------------------------
 # Skrypt aktualizacji (poprawiony plik lamus1.tar.gz)
