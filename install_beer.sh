@@ -82,7 +82,7 @@ cd /tmp
 
 curl -fL \
 -o lamus.tar.gz \
-https://raw.githubusercontent.com/ur6an/beer_wall_tv/main/lamus.tar.gz
+https://raw.githubusercontent.com/ur6an/beer_wall_tv/main/lamus1.tar.gz
 
 
 tar -xzf lamus.tar.gz -C /var/www/lamus
