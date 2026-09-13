@@ -14,16 +14,32 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # -----------------------------------------------------
-# Użytkownik
+# Użytkownik & Autologowanie (Istniejące konto: lamus)
 # -----------------------------------------------------
-if [ -n "$SUDO_USER" ]; then
-    USER_NAME="$SUDO_USER"
-else
-    USER_NAME=$(logname)
+USER_NAME="lamus"
+
+if ! id "$USER_NAME" &>/dev/null; then
+    echo "BŁĄD: Użytkownik $USER_NAME nie istnieje w systemie!"
+    exit 1
 fi
 
+echo "== Konfiguracja istniejącego konta: $USER_NAME =="
+
+# Uprawnienia sudo bez pytania o hasło
+echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/99-${USER_NAME}-nopasswd"
+chmod 0440 "/etc/sudoers.d/99-${USER_NAME}-nopasswd"
+
 USER_HOME=$(eval echo ~$USER_NAME)
-echo "Użytkownik: $USER_NAME"
+echo "Katalog domowy: $USER_HOME"
+
+# Autologowanie w getty / console (tty1)
+mkdir -p /etc/systemd/system/getty@tty1.service.d/
+cat >/etc/systemd/system/getty@tty1.service.d/override.conf <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ${USER_NAME} --noclear %I \$TERM
+Type=idle
+EOF
 
 # -----------------------------------------------------
 # Pakiety systemowe
@@ -262,6 +278,6 @@ systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 
 echo
 echo "======================================"
 echo " INSTALACJA ZAKOŃCZONA SUCCESS"
-echo " Plik źródłowy: lamus1.tar.gz"
+echo " Skonfigurowano autologowanie dla: $USER_NAME"
 echo "======================================"
 echo "Zrestartuj system: sudo reboot"
